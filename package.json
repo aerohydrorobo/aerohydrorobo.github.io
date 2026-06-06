@@ -6,7 +6,7 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "deploy": "vite build && gh-pages -d dist"
+        "deploy": "vite build && git add . && git commit -m 'Production deploy' && git push -f origin main"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.43.4",
