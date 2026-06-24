@@ -1,4 +1,3 @@
-
 name: Deploy Vite Site to Pages
 
 on:
@@ -23,11 +22,11 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22 # ডেপ্রিকেশন ওয়ার্নিং এড়াতে লেটেস্ট স্টেবল ভার্সন
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install # npm ci এর বদলে স্ট্যান্ডার্ড ইনস্টল ব্যবহার করছি যেন কোনো ফাইল মিসিং না হয়
 
       - name: Build
         run: npm run build
