@@ -71,7 +71,9 @@ export default function EngineersPage({ navigate, user }) {
                                     return (
                                         <div key={eng.id} className="engineer-card" onClick={() => navigate(`profile-${eng.id}`)}>
                                             <div className="eng-top">
-                                                <AvatarEl initials={initials} color={color} />
+                                                {eng.avatar_url && !eng.anonymous_mode
+                                                    ? <img src={eng.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                                    : <AvatarEl initials={initials} color={color} />}
                                                 <div>
                                                     <div className="eng-name">
                                                         {eng.anonymous_mode ? "Anonymous Engineer" : eng.full_name}

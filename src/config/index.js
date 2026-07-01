@@ -1,4 +1,12 @@
 export const CONFIG = {
+    // Only these emails can access /admin, regardless of what's in the
+    // database. This is intentionally hardcoded (not a DB role) so nobody
+    // can grant themselves admin access by editing a row in Supabase.
+    // To add/remove an admin, edit this array and redeploy.
+    adminEmails: [
+        "ephemeris.void@gmail.com", // <-- replace with your real account email
+    ],
+
     departments: [
         "EEE", "CSE", "SWE", "Mechanical",
         "Aerospace", "Naval Architecture", "Robotics"

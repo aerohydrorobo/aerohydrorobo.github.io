@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react";
-import { supabase } from "./lib/supabase";
+import { useEffect } from "react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { AuthProvider, useAuth } from "./lib/AuthContext";
+import { RequireAuth, RequireAdmin, PageSpinner } from "./components/RouteGuards";
 import Navbar from "./components/Navbar";
+
 import HomePage from "./pages/HomePage";
+import FeedPage from "./pages/FeedPage";
 import AuthPage from "./pages/AuthPage";
 import VerifyPage from "./pages/VerifyPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -11,271 +15,97 @@ import LeaderboardPage from "./pages/LeaderboardPage";
 import MessagesPage from "./pages/MessagesPage";
 import AdminPage from "./pages/AdminPage";
 
-const css = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: #FAFAF8; color: #1A1A18; line-height: 1.6; }
-  :root {
-    --green: #1D9E75; --green-dark: #0F6E56; --green-light: #E1F5EE; --green-mid: #9FE1CB;
-    --blue: #185FA5; --blue-light: #E6F1FB; --purple: #534AB7; --purple-light: #EEEDFE;
-    --amber: #854F0B; --amber-light: #FAEEDA; --red: #A32D2D; --red-light: #FCEBEB;
-    --border: rgba(0,0,0,0.08); --border-dark: rgba(0,0,0,0.15);
-    --text: #1A1A18; --text-muted: #6B6B67; --text-light: #9B9B96;
-    --bg: #FAFAF8; --bg-card: #FFFFFF; --bg-secondary: #F4F4F0;
-    --radius: 10px; --radius-lg: 14px; --radius-xl: 20px;
-  }
-  .nav { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 56px; background: rgba(250,250,248,0.92); backdrop-filter: blur(12px); border-bottom: 0.5px solid var(--border); }
-  .nav-logo { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; cursor: pointer; color: var(--text); }
-  .nav-logo span { color: var(--green); }
-  .nav-links { display: flex; gap: 0.25rem; align-items: center; }
-  .nav-link { font-size: 14px; color: var(--text-muted); background: none; border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; }
-  .nav-link:hover { background: var(--bg-secondary); color: var(--text); }
-  .nav-link.active { color: var(--text); font-weight: 500; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; font-family: inherit; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: pointer; padding: 8px 16px; border: none; transition: all 0.15s; }
-  .btn-primary { background: var(--green); color: #fff; }
-  .btn-primary:hover { background: var(--green-dark); }
-  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-  .btn-outline { background: transparent; color: var(--text); border: 0.5px solid var(--border-dark); }
-  .btn-outline:hover { background: var(--bg-secondary); }
-  .btn-sm { padding: 5px 12px; font-size: 13px; }
-  .btn-danger { background: var(--red-light); color: var(--red); border: none; }
-  .page { min-height: calc(100vh - 56px); }
-  .container { max-width: 960px; margin: 0 auto; padding: 0 2rem; }
-  .section { padding: 3rem 0; }
-  .hero { padding: 4rem 2rem 3rem; text-align: center; max-width: 680px; margin: 0 auto; }
-  .badge-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--green-light); color: var(--green-dark); font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 20px; margin-bottom: 1.5rem; }
-  .hero h1 { font-size: 38px; font-weight: 500; line-height: 1.2; letter-spacing: -0.8px; margin-bottom: 1rem; color: var(--text); }
-  .hero h1 em { font-style: normal; color: var(--green); }
-  .hero p { font-size: 16px; color: var(--text-muted); line-height: 1.7; margin-bottom: 2rem; }
-  .hero-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-  .stats-bar { display: flex; justify-content: center; gap: 3rem; padding: 1.5rem 2rem; border-top: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border); background: var(--bg-card); }
-  .stat-item { text-align: center; }
-  .stat-num { font-size: 22px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; }
-  .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .domain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 0 auto; max-width: 960px; padding: 0 2rem; }
-  .domain-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; cursor: pointer; transition: border-color 0.15s; }
-  .domain-card:hover { border-color: var(--border-dark); }
-  .domain-icon { width: 42px; height: 42px; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 1rem; }
-  .domain-card h3 { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
-  .domain-count { font-size: 12px; color: var(--text-muted); margin-top: 12px; }
-  .tag-row { display: flex; flex-wrap: wrap; gap: 5px; }
-  .tag { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
-  .tag-green { background: var(--green-light); color: var(--green-dark); }
-  .tag-blue { background: var(--blue-light); color: var(--blue); }
-  .tag-purple { background: var(--purple-light); color: var(--purple); }
-  .tag-amber { background: var(--amber-light); color: var(--amber); }
-  .tag-gray { background: var(--bg-secondary); color: var(--text-muted); border: 0.5px solid var(--border); }
-  .sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
-  .sec-title { font-size: 17px; font-weight: 500; letter-spacing: -0.2px; }
-  .sec-link { font-size: 13px; color: var(--green); background: none; border: none; cursor: pointer; font-family: inherit; }
-  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .engineer-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; cursor: pointer; transition: border-color 0.15s; }
-  .engineer-card:hover { border-color: var(--border-dark); }
-  .eng-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
-  .avatar-green { background: var(--green-light); color: var(--green-dark); }
-  .avatar-blue { background: var(--blue-light); color: var(--blue); }
-  .avatar-purple { background: var(--purple-light); color: var(--purple); }
-  .avatar-amber { background: var(--amber-light); color: var(--amber); }
-  .avatar-lg { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; flex-shrink: 0; }
-  .eng-name { font-size: 14px; font-weight: 500; }
-  .eng-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .badge-row { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
-  .badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
-  .badge-verified { background: var(--green-light); color: var(--green-dark); }
-  .badge-open { background: #EAF3DE; color: #3B6D11; }
-  .badge-domain-blue { background: var(--blue-light); color: var(--blue); }
-  .badge-domain-purple { background: var(--purple-light); color: var(--purple); }
-  .badge-domain-green { background: var(--green-light); color: var(--green-dark); }
-  .badge-student { background: var(--amber-light); color: var(--amber); }
-  .skill-row { display: flex; flex-wrap: wrap; gap: 4px; }
-  .skill-chip { font-size: 11px; padding: 3px 7px; border-radius: 4px; background: var(--bg-secondary); color: var(--text-muted); border: 0.5px solid var(--border); }
-  .gig-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; display: flex; align-items: center; gap: 1rem; cursor: pointer; transition: border-color 0.15s; }
-  .gig-card:hover { border-color: var(--border-dark); }
-  .gig-left { flex: 1; }
-  .gig-company { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
-  .gig-title { font-size: 14px; font-weight: 500; margin-bottom: 8px; }
-  .gig-right { text-align: right; flex-shrink: 0; }
-  .gig-budget { font-size: 15px; font-weight: 600; color: var(--text); }
-  .urgency-high { background: var(--red-light); color: var(--red); font-size: 11px; padding: 3px 8px; border-radius: 20px; display: inline-block; margin-top: 4px; }
-  .urgency-mid { background: var(--amber-light); color: var(--amber); font-size: 11px; padding: 3px 8px; border-radius: 20px; display: inline-block; margin-top: 4px; }
-  .urgency-low { background: var(--green-light); color: var(--green-dark); font-size: 11px; padding: 3px 8px; border-radius: 20px; display: inline-block; margin-top: 4px; }
-  .divider { height: 0.5px; background: var(--border); margin: 0; }
-  .form-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-xl); padding: 2rem; max-width: 520px; margin: 2rem auto; }
-  .form-title { font-size: 20px; font-weight: 500; margin-bottom: 6px; letter-spacing: -0.3px; }
-  .form-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 1.5rem; }
-  .form-group { margin-bottom: 1rem; }
-  .form-label { font-size: 13px; font-weight: 500; color: var(--text); display: block; margin-bottom: 6px; }
-  .form-input { width: 100%; padding: 10px 12px; border: 0.5px solid var(--border-dark); border-radius: 8px; font-family: inherit; font-size: 14px; color: var(--text); background: var(--bg); outline: none; transition: border-color 0.15s; }
-  .form-input:focus { border-color: var(--green); }
-  .form-select { width: 100%; padding: 10px 12px; border: 0.5px solid var(--border-dark); border-radius: 8px; font-family: inherit; font-size: 14px; color: var(--text); background: var(--bg); outline: none; cursor: pointer; }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .role-select { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.25rem; }
-  .role-card { border: 0.5px solid var(--border-dark); border-radius: var(--radius); padding: 1rem; cursor: pointer; text-align: center; transition: all 0.15s; }
-  .role-card:hover { border-color: var(--green); }
-  .role-card.selected { border: 1.5px solid var(--green); background: var(--green-light); }
-  .role-card-icon { font-size: 24px; margin-bottom: 6px; }
-  .role-card-title { font-size: 14px; font-weight: 500; }
-  .role-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .form-footer { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 1rem; }
-  .form-footer button { background: none; border: none; color: var(--green); cursor: pointer; font-family: inherit; font-size: 13px; }
-  .error-box { background: var(--red-light); color: var(--red); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; }
-  .success-box { background: var(--green-light); color: var(--green-dark); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 1rem; }
-  .verify-step { display: flex; align-items: flex-start; gap: 14px; background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 10px; }
-  .step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--green-light); color: var(--green-dark); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .step-num.done { background: var(--green); color: #fff; }
-  .step-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
-  .step-sub { font-size: 13px; color: var(--text-muted); }
-  .upload-area { border: 1.5px dashed var(--border-dark); border-radius: var(--radius); padding: 1.5rem; text-align: center; cursor: pointer; transition: border-color 0.15s; margin-top: 10px; }
-  .upload-area:hover { border-color: var(--green); }
-  .upload-text { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
-  .purge-note { background: var(--green-light); border-radius: var(--radius); padding: 10px 14px; font-size: 13px; color: var(--green-dark); display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-  .page-title { font-size: 24px; font-weight: 500; letter-spacing: -0.4px; margin-bottom: 6px; }
-  .page-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 2rem; }
-  .filter-bar { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 1.5rem; }
-  .filter-label { font-size: 13px; font-weight: 500; color: var(--text-muted); }
-  .filter-chip { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 0.5px solid var(--border-dark); background: var(--bg); color: var(--text-muted); transition: all 0.15s; }
-  .filter-chip.active { background: var(--green-light); color: var(--green-dark); border-color: var(--green); }
-  .tabs { display: flex; gap: 2px; margin-bottom: 1.5rem; background: var(--bg-secondary); padding: 4px; border-radius: 10px; width: fit-content; }
-  .tab-btn { padding: 7px 16px; border-radius: 7px; font-size: 14px; font-family: inherit; font-weight: 500; cursor: pointer; border: none; background: transparent; color: var(--text-muted); transition: all 0.15s; }
-  .tab-btn.active { background: var(--bg-card); color: var(--text); border: 0.5px solid var(--border); }
-  .dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 2rem; }
-  .metric-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
-  .metric-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
-  .metric-value { font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; }
-  .company-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 10px; }
-  .vault-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-  .vault-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
-  .vault-card-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
-  .vault-card-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 1rem; }
-  .vault-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; }
-  .vault-item:last-child { border-bottom: none; }
-  .note-input { width: 100%; min-height: 80px; padding: 10px; border: 0.5px solid var(--border-dark); border-radius: 8px; font-family: inherit; font-size: 13px; color: var(--text); background: var(--bg); resize: none; outline: none; }
-  .note-input:focus { border-color: var(--green); }
-  .rejection-reason { font-size: 12px; color: var(--text-muted); margin-top: 8px; background: var(--bg-secondary); padding: 8px 12px; border-radius: 8px; }
-  .admin-sidebar { width: 200px; flex-shrink: 0; background: var(--bg-card); border-right: 0.5px solid var(--border); min-height: calc(100vh - 56px); padding: 1.5rem 1rem; }
-  .admin-layout { display: flex; }
-  .admin-main { flex: 1; padding: 2rem; }
-  .sidebar-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text-muted); margin-bottom: 2px; background: none; border: none; font-family: inherit; width: 100%; text-align: left; }
-  .sidebar-item:hover { background: var(--bg-secondary); color: var(--text); }
-  .sidebar-item.active { background: var(--green-light); color: var(--green-dark); font-weight: 500; }
-  .queue-item { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 10px; display: flex; align-items: center; gap: 1rem; }
-  .queue-info { flex: 1; }
-  .queue-name { font-size: 14px; font-weight: 500; }
-  .queue-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .queue-actions { display: flex; gap: 8px; }
-  .btn-approve { background: var(--green); color: #fff; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
-  .btn-reject { background: var(--red-light); color: var(--red); border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
-  .msg-layout { display: grid; grid-template-columns: 280px 1fr; height: calc(100vh - 56px); }
-  .msg-sidebar { border-right: 0.5px solid var(--border); overflow-y: auto; }
-  .msg-header { padding: 1rem 1.25rem; border-bottom: 0.5px solid var(--border); font-weight: 500; font-size: 15px; }
-  .msg-thread-item { padding: 12px 1.25rem; border-bottom: 0.5px solid var(--border); cursor: pointer; transition: background 0.1s; }
-  .msg-thread-item:hover { background: var(--bg-secondary); }
-  .msg-thread-item.active { background: var(--green-light); }
-  .msg-thread-name { font-size: 14px; font-weight: 500; }
-  .msg-thread-preview { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .msg-main { display: flex; flex-direction: column; }
-  .msg-top { padding: 1rem 1.5rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 10px; }
-  .msg-body { flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-  .msg-bubble { max-width: 60%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
-  .msg-bubble.sent { background: var(--green); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
-  .msg-bubble.recv { background: var(--bg-card); border: 0.5px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
-  .msg-input-bar { padding: 1rem 1.5rem; border-top: 0.5px solid var(--border); display: flex; gap: 10px; }
-  .msg-input { flex: 1; padding: 10px 14px; border: 0.5px solid var(--border-dark); border-radius: 20px; font-family: inherit; font-size: 14px; outline: none; background: var(--bg); }
-  .msg-input:focus { border-color: var(--green); }
-  .lb-item { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; margin-bottom: 8px; }
-  .lb-rank { font-size: 18px; font-weight: 600; color: var(--text-muted); width: 32px; text-align: center; }
-  .lb-rank.top { color: var(--green); }
-  .lb-info { flex: 1; }
-  .lb-name { font-size: 14px; font-weight: 500; }
-  .lb-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-  .lb-score { font-size: 16px; font-weight: 600; color: var(--green); }
-  .trending-card { background: var(--bg-card); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; }
-  .trend-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
-  .trend-item:last-child { border-bottom: none; }
-  .trend-rank { font-size: 12px; font-weight: 600; color: var(--text-muted); width: 20px; }
-  .trend-name { flex: 1; font-size: 14px; font-weight: 500; }
-  .trend-bar { width: 80px; height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
-  .trend-bar-fill { height: 100%; background: var(--green); border-radius: 3px; }
-  .trend-count { font-size: 12px; color: var(--text-muted); }
-  .footer { border-top: 0.5px solid var(--border); padding: 1.5rem 2rem; text-align: center; font-size: 13px; color: var(--text-muted); }
-  .loading { display: flex; align-items: center; justify-content: center; padding: 3rem; font-size: 14px; color: var(--text-muted); }
-  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 10px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .apply-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 200; }
-  .apply-box { background: var(--bg-card); border-radius: var(--radius-xl); padding: 1.75rem; width: 440px; border: 0.5px solid var(--border); }
-  .modal-title { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
-  .modal-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 1.25rem; }
-  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
-  .growth-bar-wrap { margin-bottom: 10px; }
-  .growth-bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
-  .growth-bar { height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
-  .growth-bar-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.6s; }
-`;
+/**
+ * ---------------------------------------------------------------
+ * HOW TO ADD A NEW PAGE / FEATURE:
+ * 1. Create the component in src/pages/YourPage.jsx
+ * 2. Import it above
+ * 3. Add ONE <Route> line in <AppRoutes> below
+ * 4. (Optional) Add a nav link in src/components/Navbar.jsx
+ * That's it — no other file needs to change.
+ * ---------------------------------------------------------------
+ */
 
-export default function App() {
-  const [page, setPage] = useState("home");
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setAuthLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-      if (session?.user) fetchProfile(session.user.id);
-      else { setProfile(null); setAuthLoading(false); }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchProfile = async (userId) => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
-    setProfile(data);
-    setAuthLoading(false);
-  };
-
-  const navigate = (p) => {
-    setPage(p);
-    window.scrollTo(0, 0);
-  };
-
-  if (authLoading) return (
-    <>
-      <style>{css}</style>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh" }}>
-        <div className="spinner" style={{ width: 32, height: 32 }} />
-      </div>
-    </>
-  );
-
-  const renderPage = () => {
-    switch (page) {
-      case "home": return <HomePage navigate={navigate} user={user} />;
-      case "register": return <AuthPage navigate={navigate} setUser={setUser} />;
-      case "verify": return <VerifyPage navigate={navigate} user={user} />;
-      case "dashboard": return user ? <DashboardPage navigate={navigate} user={user} /> : <AuthPage navigate={navigate} setUser={setUser} />;
-      case "engineers": return <EngineersPage navigate={navigate} user={user} />;
-      case "gigs": return <GigsPage navigate={navigate} user={user} />;
-      case "leaderboard": return <LeaderboardPage />;
-      case "messages": return <MessagesPage user={user} profile={profile} />;
-      case "admin": return <AdminPage />;
-      default: return <HomePage navigate={navigate} user={user} />;
+// Pages still receive a `navigate(key)` prop for backward compatibility
+// with existing page code (which calls navigate("dashboard") etc.).
+// New pages are free to use react-router's useNavigate()/<Link> directly instead.
+function useLegacyNavigate() {
+  const navigate = useNavigate();
+  return (key) => {
+    if (key.startsWith("profile-")) {
+      navigate(`/engineers/${key.replace("profile-", "")}`);
+      return;
     }
+    const map = {
+      home: "/",
+      register: "/register",
+      verify: "/verify",
+      dashboard: "/dashboard",
+      engineers: "/engineers",
+      gigs: "/gigs",
+      leaderboard: "/leaderboard",
+      messages: "/messages",
+      admin: "/admin",
+    };
+    navigate(map[key] || `/${key}`);
   };
+}
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
+function AppRoutes() {
+  const { user, profile, setUser } = useAuth();
+  const navigate = useLegacyNavigate();
+
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage navigate={navigate} user={user} />} />
+      <Route path="/feed" element={<FeedPage user={user} profile={profile} />} />
+      <Route path="/register" element={<AuthPage navigate={navigate} setUser={setUser} />} />
+      <Route path="/verify" element={<VerifyPage navigate={navigate} user={user} />} />
+      <Route path="/engineers" element={<EngineersPage navigate={navigate} user={user} />} />
+      <Route path="/engineers/:id" element={<EngineersPage navigate={navigate} user={user} />} />
+      <Route path="/gigs" element={<GigsPage navigate={navigate} user={user} />} />
+      <Route path="/leaderboard" element={<LeaderboardPage />} />
+
+      <Route path="/dashboard" element={
+        <RequireAuth><DashboardPage navigate={navigate} user={user} /></RequireAuth>
+      } />
+      <Route path="/messages" element={
+        <RequireAuth><MessagesPage user={user} profile={profile} /></RequireAuth>
+      } />
+      <Route path="/admin" element={
+        <RequireAdmin><AdminPage /></RequireAdmin>
+      } />
+
+      {/* Unknown URL -> send home instead of a blank page */}
+      <Route path="*" element={<HomePage navigate={navigate} user={user} />} />
+    </Routes>
+  );
+}
+
+function AppShell() {
+  const { user, profile, authLoading } = useAuth();
+
+  if (authLoading) return <PageSpinner />;
 
   return (
     <>
-      <style>{css}</style>
-      <Navbar page={page} navigate={navigate} user={user} />
-      {renderPage()}
+      <ScrollToTop />
+      <Navbar user={user} profile={profile} />
+      <AppRoutes />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   );
 }

@@ -152,7 +152,47 @@ function ApplicationsTab({ userId }) {
     );
 }
 
-function EditProfileTab({ profile, updateProfile }) {
+function AvatarUploader({ profile, user, onUploaded }) {
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState("");
+
+    const handleFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 3 * 1024 * 1024) { setError("Image must be under 3MB."); return; }
+        setError(""); setUploading(true);
+
+        const ext = file.name.split(".").pop();
+        const path = `${user.id}/${Date.now()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+        if (uploadError) { setUploading(false); setError(uploadError.message); return; }
+
+        const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+        onUploaded(publicUrl);
+        setUploading(false);
+    };
+
+    return (
+        <div className="avatar-uploader">
+            {profile?.avatar_url
+                ? <img src={profile.avatar_url} alt="" className="avatar-uploader-img" />
+                : <div className="avatar-uploader-fallback">{(profile?.full_name || "U")[0].toUpperCase()}</div>}
+            <div>
+                <label className="btn btn-outline btn-sm" style={{ cursor: "pointer" }}>
+                    {uploading ? "Uploading..." : "Change photo"}
+                    <input type="file" accept="image/*" hidden onChange={handleFile} disabled={uploading} />
+                </label>
+                {error && <div style={{ color: "var(--red)", fontSize: 12, marginTop: 6 }}>{error}</div>}
+                <div style={{ fontSize: 11, color: "var(--text-light)", marginTop: 6 }}>JPG/PNG, up to 3MB</div>
+            </div>
+        </div>
+    );
+}
+
+function EditProfileTab({ profile, updateProfile, user }) {
+    const [fullName, setFullName] = useState(profile?.full_name || "");
+    const [bio, setBio] = useState(profile?.bio || "");
     const [skills, setSkills] = useState(profile?.skills || []);
     const [newSkill, setNewSkill] = useState("");
     const [github, setGithub] = useState(profile?.github_url || "");
@@ -181,6 +221,8 @@ function EditProfileTab({ profile, updateProfile }) {
     const handleSave = async () => {
         setSaving(true);
         await updateProfile({
+            full_name: fullName,
+            bio,
             skills,
             github_url: github,
             linkedin_url: linkedin,
@@ -198,6 +240,21 @@ function EditProfileTab({ profile, updateProfile }) {
     return (
         <div>
             {saved && <div className="success-box">✓ Profile saved!</div>}
+
+            <div className="company-card">
+                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 12 }}>Photo & basics</div>
+                <AvatarUploader profile={profile} user={user} onUploaded={(url) => updateProfile({ avatar_url: url })} />
+                <div className="form-group">
+                    <label className="form-label">Full name</label>
+                    <input className="form-input" value={fullName} onChange={e => setFullName(e.target.value)} />
+                </div>
+                <div className="form-group">
+                    <label className="form-label">Bio</label>
+                    <textarea className="form-input" rows={3} placeholder="Tell people what you build and what you're looking for..."
+                        value={bio} onChange={e => setBio(e.target.value)} maxLength={500} />
+                    <div style={{ fontSize: 11, color: "var(--text-light)", marginTop: 4, textAlign: "right" }}>{bio.length}/500</div>
+                </div>
+            </div>
 
             <div className="company-card">
                 <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 12 }}>Skills</div>
@@ -368,7 +425,7 @@ export default function DashboardPage({ navigate, user }) {
                 </>}
 
                 {tab === "applications" && <ApplicationsTab userId={user.id} />}
-                {tab === "edit profile" && <EditProfileTab profile={profile} updateProfile={updateProfile} />}
+                {tab === "edit profile" && <EditProfileTab profile={profile} updateProfile={updateProfile} user={user} />}
                 {tab === "vault" && <VaultTab />}
             </div>
         </div>
