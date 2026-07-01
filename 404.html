@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AeroHydroRobo</title>
+  <!--
+    GitHub Pages serves this file for any unknown path (e.g. a direct visit
+    or refresh on /gigs). It rewrites the URL into a query string and
+    redirects to index.html, where the tiny script in index.html restores
+    the real path so react-router can take over. This is the standard
+    spa-github-pages technique: https://github.com/rafgraph/spa-github-pages
+  -->
+  <script>
+    var path = location.pathname + location.search + location.hash;
+    location.replace('/?redirect=' + encodeURIComponent(path));
+  </script>
+</head>
+<body></body>
+</html>
